@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ultrasson Reader — OCR de laudos</title>
+  <style>
+    /* ==========================================================
+       PALETA — Pantone Blue 286 C como acento principal
+       ========================================================== */
+    :root[data-theme='dark'] {
+      --bg:        #0a1733;   /* azul Pantone escurecido */
+      --surface:   #112347;
+      --surface-2: #1a2f5c;
+      --border:    #25407a;
+      --text:      #eaf1ff;
+      --muted:     #8aa3d4;
+      --accent:    #0033a0;   /* Pantone 286 C */
+      --accent-2:  #1f4fd1;
+      --accent-3:  #4d7cf0;
+      --on-accent: #ffffff;
+      --ok:        #34d399;
+      --err:       #f87171;
+      --warn:      #fbbf24;
+      --shadow:    0 10px 30px rgba(0,0,0,0.45);
+    }
+    :root[data-theme='light'] {
+      --bg:        #f4f7fc;
+      --surface:   #ffffff;
+      --surface-2: #eef2fb;
+      --border:    #d6deee;
+      --text:      #0a1733;
+      --muted:     #5b6b8c;
+      --accent:    #0033a0;
+      --accent-2:  #1f4fd1;
+      --accent-3:  #4d7cf0;
+      --on-accent: #ffffff;
+      --ok:        #059669;
+      --err:       #dc2626;
+      --warn:      #d97706;
+      --shadow:    0 10px 30px rgba(10,23,51,0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh;
+      transition: background 0.25s, color 0.25s;
+    }
+
+    /* ==========================================================
+       HEADER — centralizado, amigável
+       ========================================================== */
+    header {
+      position: relative;
+      padding: 2.25rem 2rem 2rem;
+      background:
+        radial-gradient(1200px 240px at 50% -40px, rgba(31,79,209,0.35), transparent 70%),
+        var(--surface);
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+    header h1 .dot {
+      display: inline-block;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--accent);
+      margin-right: 0.6rem;
+      vertical-align: middle;
+      box-shadow: 0 0 0 4px rgba(0,51,160,0.18);
+    }
+    header .tagline {
+      margin: 0.5rem 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 400;
+    }
+    .header-tools {
+      position: absolute;
+      top: 1.25rem; right: 1.25rem;
+      display: flex; gap: 0.5rem; align-items: center;
+    }
+
+    /* botão-ícone (provider, tema) */
+    .icon-btn {
+      width: 38px; height: 38px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.15s;
+      padding: 0;
+    }
+    .icon-btn:hover { border-color: var(--accent-3); color: var(--accent-3); }
+    .icon-btn svg { width: 18px; height: 18px; }
+    .icon-btn[data-state='ok']  { color: var(--ok);  border-color: rgba(52,211,153,0.4); }
+    .icon-btn[data-state='err'] { color: var(--err); border-color: rgba(248,113,113,0.4); }
+
+    /* tooltip nativo via [data-tooltip] */
+    [data-tooltip] {
+      position: relative;
+    }
+    [data-tooltip]:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      top: calc(100% + 8px); left: 50%;
+      transform: translateX(-50%);
+      background: var(--text); color: var(--bg);
+      padding: 0.4rem 0.65rem;
+      font-size: 0.75rem; font-weight: 500;
+      border-radius: 6px;
+      white-space: nowrap;
+      z-index: 9999;
+      box-shadow: var(--shadow);
+      pointer-events: none;
+    }
+    /* tooltips do header alinhados à direita (não saem da tela) */
+    .header-tools [data-tooltip]:hover::after {
+      left: auto; right: 0; transform: none;
+    }
+    /* o card precisa permitir que o tooltip "salte" pra fora */
+    .file-card, .file-card .body, .card-actions { overflow: visible; }
+    /* card hover sobe o stacking context pra tooltip vencer cards adjacentes */
+    .file-card:hover { z-index: 5; position: relative; }
+
+    /* ==========================================================
+       MAIN
+       ========================================================== */
+    main {
+      padding: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding-bottom: 7rem; /* espaço pro FAB */
+    }
+
+    .dropzone {
+      display: block;
+      border: 2px dashed var(--border);
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 2.75rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .dropzone:hover, .dropzone.drag {
+      border-color: var(--accent);
+      background: var(--surface-2);
+      box-shadow: 0 0 0 4px rgba(0,51,160,0.12);
+    }
+    .dropzone h2 { margin: 0 0 0.4rem; font-size: 1.05rem; font-weight: 600; }
+    .dropzone p  { margin: 0; color: var(--muted); font-size: 0.875rem; }
+    .dropzone input { display: none; }
+
+    .actions {
+      margin-top: 1.25rem;
+      display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center;
+    }
+    button {
+      background: var(--accent); color: var(--on-accent);
+      border: 0; padding: 0.55rem 1rem; border-radius: 8px;
+      font-weight: 600; cursor: pointer; font-size: 0.875rem;
+      transition: all 0.15s;
+    }
+    button:hover:not(:disabled) { background: var(--accent-2); transform: translateY(-1px); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.secondary {
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border);
+    }
+    button.secondary:hover:not(:disabled) {
+      background: var(--surface-2); border-color: var(--accent-3);
+      color: var(--accent-3); transform: none;
+    }
+
+    .summary {
+      margin-left: auto;
+      color: var(--muted); font-size: 0.85rem;
+      display: flex; gap: 1.25rem; flex-wrap: wrap;
+    }
+    .summary strong { color: var(--text); }
+
+    /* ==========================================================
+       CARDS
+       ========================================================== */
+    .files-list {
+      margin-top: 2rem;
+      display: grid; gap: 1rem;
+    }
+    .file-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px;
+      display: grid; grid-template-columns: 200px 1fr; gap: 0;
+      transition: border-color 0.15s, transform 0.15s;
+      /* sem overflow:hidden — para não cortar tooltips */
+    }
+    .file-card:hover { border-color: var(--accent-3); }
+    .file-card .thumb {
+      background: #000; display: flex; align-items: center; justify-content: center;
+      max-height: 260px;
+      border-top-left-radius: 12px;
+      border-bottom-left-radius: 12px;
+      overflow: hidden; /* clipa só a thumb */
+    }
+    .file-card .thumb img { max-width: 100%; max-height: 260px; display: block; }
+    .file-card .body { padding: 1rem 1.25rem; min-width: 0; }
+    .file-card .top {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 1rem; margin-bottom: 0.4rem;
+    }
+    .file-card .top h3 {
+      margin: 0; font-size: 0.95rem; font-weight: 600; word-break: break-all;
+      color: var(--text);
+    }
+    .file-card .top .status {
+      font-size: 0.72rem; padding: 0.2rem 0.6rem; border-radius: 999px;
+      border: 1px solid var(--border); white-space: nowrap;
+    }
+    .status.pending  { color: var(--muted); }
+    .status.running  { color: var(--warn); border-color: var(--warn); }
+    .status.done     { color: var(--ok);   border-color: var(--ok); }
+    .status.error    { color: var(--err);  border-color: var(--err); }
+
+    .meta-line { color: var(--muted); font-size: 0.78rem; }
+
+    .file-card pre {
+      background: var(--bg); color: var(--text);
+      padding: 0.9rem; border-radius: 8px;
+      font-family: 'SF Mono', Menlo, monospace; font-size: 0.78rem;
+      max-height: 260px; overflow: auto;
+      white-space: pre-wrap; word-break: break-word;
+      margin: 0.6rem 0 0;
+      border: 1px solid var(--border);
+    }
+    .file-card .card-actions {
+      margin-top: 0.75rem; display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;
+    }
+    .file-card .err-msg {
+      color: var(--err); font-size: 0.85rem; margin-top: 0.5rem;
+      padding: 0.5rem 0.7rem; background: rgba(248,113,113,0.08);
+      border-radius: 6px; border-left: 3px solid var(--err);
+    }
+
+    /* ícone pequeno (download/copy/refresh/trash) */
+    .icon-btn-sm {
+      width: 32px; height: 32px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: transparent; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 8px;
+      cursor: pointer; padding: 0;
+      transition: all 0.15s;
+    }
+    .icon-btn-sm:hover { color: var(--accent-3); border-color: var(--accent-3); }
+    .icon-btn-sm svg { width: 16px; height: 16px; }
+
+    /* botão "ícone + texto" da mesma altura (32px) — usado em "Processar" */
+    .btn-sm {
+      height: 32px;
+      padding: 0 0.7rem;
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.82rem; font-weight: 600;
+      transition: all 0.15s;
+    }
+    .btn-sm:hover { color: var(--accent-3); border-color: var(--accent-3); }
+    .btn-sm svg { width: 14px; height: 14px; }
+
+    /* ==========================================================
+       FAB — botão fixo de download geral
+       ========================================================== */
+    .fab {
+      position: fixed;
+      bottom: 1.75rem;
+      right: 1.75rem;
+      z-index: 50;
+      display: inline-flex; align-items: center; gap: 0.6rem;
+      background: var(--accent);
+      color: var(--on-accent);
+      border: 0;
+      padding: 0.95rem 1.4rem;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      box-shadow: var(--shadow), 0 0 0 0 rgba(0,51,160,0.5);
+      transition: all 0.2s;
+    }
+    .fab:hover:not(:disabled) {
+      background: var(--accent-2);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow), 0 0 0 8px rgba(0,51,160,0.12);
+    }
+    .fab:disabled {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(20px);
+    }
+    .fab svg { width: 20px; height: 20px; }
+    .fab .badge {
+      background: var(--on-accent); color: var(--accent);
+      font-size: 0.75rem; font-weight: 700;
+      min-width: 22px; height: 22px;
+      border-radius: 999px;
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 0 0.4rem;
+    }
+
+    footer {
+      padding: 1.25rem 2rem; color: var(--muted);
+      font-size: 0.78rem; text-align: center;
+      border-top: 1px solid var(--border); margin-top: 3rem;
+    }
+
+    @media (max-width: 700px) {
+      header { padding: 1.5rem 1rem 1.25rem; }
+      header h1 { font-size: 1.4rem; }
+      .header-tools { top: 0.85rem; right: 0.85rem; }
+      .file-card { grid-template-columns: 1fr; }
+      .file-card .thumb {
+        max-height: 180px;
+        border-top-right-radius: 12px;
+        border-bottom-left-radius: 0;
+      }
+      main { padding: 1.25rem; padding-bottom: 6rem; }
+      .fab { bottom: 1rem; right: 1rem; padding: 0.85rem 1.1rem; font-size: 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span class="dot"></span>Ultrasson Reader</h1>
+    <p class="tagline">Transforme imagens de ultrassom em laudos prontos — em segundos.</p>
+
+    <div class="header-tools">
+      <button id="providerBadge" class="icon-btn" data-tooltip="Verificando provider…" aria-label="Provider ativo">
+        <!-- ícone cpu -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="4" width="16" height="16" rx="2"/>
+          <rect x="9" y="9" width="6" height="6"/>
+          <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>
+        </svg>
+      </button>
+      <button id="themeToggle" class="icon-btn" data-tooltip="Alternar tema" aria-label="Alternar tema">
+        <!-- ícone sol/lua trocado por JS -->
+        <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <label class="dropzone" id="dropzone" for="imageInput">
+      <h2>Arraste imagens de ultrassom aqui</h2>
+      <p>ou clique para selecionar — múltiplos arquivos (PNG, JPG, BMP, TIFF, WebP)</p>
+      <input type="file" id="imageInput" accept="image/*" multiple />
+    </label>
+
+    <div class="actions">
+      <button id="processBtn" disabled>Processar todas</button>
+      <button id="clearBtn" class="secondary" disabled>Limpar lista</button>
+      <div class="summary" id="summary"></div>
+    </div>
+
+    <div class="files-list" id="filesList"></div>
+  </main>
+
+  <!-- FAB: download de TODOS em um único TXT -->
+  <button id="downloadAllBtn" class="fab" disabled aria-label="Baixar todos como um único TXT">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    <span>Baixar TXT consolidado</span>
+    <span id="fabBadge" class="badge">0</span>
+  </button>
+
+  <footer>
+    Configurado em <code>config.js</code> — local, não versionado.
+  </footer>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
