@@ -1,0 +1,60 @@
+{
+  "name": "ultrasson_reader",
+  "productName": "Ultrasson Reader",
+  "version": "1.0.0",
+  "description": "Leitor de laudos de ultrassom via OpenAI Vision (OCR sem backend)",
+  "main": "main.js",
+  "license": "MIT",
+  "author": "Nicolai",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "serve": "npx --yes serve .",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^31.3.1",
+    "electron-builder": "^25.0.5"
+  },
+  "build": {
+    "appId": "com.nicolai.ultrasson-reader",
+    "productName": "Ultrasson Reader",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "index.html",
+      "config.js",
+      "src/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
+      ],
+      "category": "public.app-category.medical"
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] }
+      ],
+      "category": "Science"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
+  }
+}

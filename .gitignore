@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+dist/
+build/
+
+# API key - NUNCA commitar!
+config.js
+.env
+.env.local
